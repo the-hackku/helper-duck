@@ -64,7 +64,9 @@ show_column_numbers = true
 show_error_codes = true
 show_traceback = true
 disallow_any_decorated = true
-disallow_any_unimported = true
+# nextcord does not have type annotations and there are errors
+# left and right from nextcord types resolving to Any
+disallow_any_unimported = false
 ignore_missing_imports = true
 local_partial_types = true
 no_implicit_optional = true
