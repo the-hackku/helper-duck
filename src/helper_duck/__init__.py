@@ -24,16 +24,17 @@ __version__ = "0.0.0"
 import json
 import logging
 import sqlite3 as sql
-from collections.abc import Iterable
 from pathlib import Path
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 import nextcord as nc
-import nextcord.utils as nc_utils
 from nextcord.ext import (
     application_checks as nc_app_checks,
     commands as nc_cmd,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 logging.basicConfig(level=logging.INFO)
 
@@ -733,16 +734,11 @@ async def opentix(ctx: nc.Interaction) -> None:
 
             # prep the data for embed.
             ticket_ids = map(str, ticket_ids)
-            logistics = map(
-                (
-                    lambda x: f"{x[0]} @ *{x[1][:10] + '...' if len(x[1]) > 10 else x[1]}*"
-                ),
-                zip(authors, locations),
+            logistics = (
+                f"{x[0]} @ *{x[1][:10] + '...' if len(x[1]) > 10 else x[1]}*"
+                for x in zip(authors, locations)
             )
-            messages = map(
-                (lambda x: f"{x[:10]}..." if len(x) > 10 else x),
-                messages,
-            )
+            messages = (f"{x[:10]}..." if len(x) > 10 else x for x in messages)
 
             tickets_embed = nc.Embed(
                 title="Open Tickets :dancer:",
@@ -885,9 +881,9 @@ async def leaderboard(ctx: nc.Interaction) -> None:  # type: ignore[misc]
             mentors, num_claimed, num_closed = zip(*mentors_query)
 
             # prep the data for embed.
-            mentors = map(
-                lambda x: f"**#{x[1]}**: {x[0]}",
-                zip(mentors, range(1, len(mentors) + 1)),
+            mentors = (
+                f"**#{x[1]}**: {x[0]}"
+                for x in zip(mentors, range(1, len(mentors) + 1))
             )
             num_claimed = map(str, num_claimed)
             num_closed = map(str, num_closed)
