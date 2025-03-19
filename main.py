@@ -1,31 +1,50 @@
-#TODO: add types
+"""Helper-duck Discord Bot."""
 
-import nextcord as nc
-from nextcord.ext import commands as nc_cmd
-import nextcord.utils as nc_utils
-from nextcord.ext import application_checks as nc_app_checks
+#  Copyright 2024 alexacallmebaka
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
 
+from __future__ import annotations
+
+import json
 import logging
 import sqlite3 as sql
-import json
+from pathlib import Path
+from typing import Final
+
+import nextcord as nc
+import nextcord.utils as nc_utils
+from nextcord.ext import application_checks as nc_app_checks
+from nextcord.ext import commands as nc_cmd
 
 logging.basicConfig(level=logging.INFO)
 
-logger = logging.getLogger('nextcord')
+LOGGER: Final = logging.getLogger('nextcord')
 
-with open('config.json') as jsonfile:
-    config = json.load(jsonfile)
+CONFIG_FILE: Final = Path('config.json')
 
-bot = nc_cmd.Bot()
+CONFIG: Final = json.loads(CONFIG_FILE.read_text())
 
-db_connection = sql.connect(config['DB_FILE'])
+bot: Final = nc_cmd.Bot()
+
+DB_CONNECTION: Final = sql.connect(CONFIG['DB_FILE'])
 
 @bot.event
-async def on_ready():
+async def on_ready() -> None:
     logging.info(f'We have logged in as {bot.user}')
 
 @bot.event
-async def on_application_command_error(ctx: nc.Interaction, err: Exception):
+async def on_application_command_error(ctx: nc.Interaction, err: Exception) -> None:
 
     user_name = ctx.user.nick if ctx.user.nick else ctx.user.global_name
 
@@ -33,18 +52,18 @@ async def on_application_command_error(ctx: nc.Interaction, err: Exception):
     await ctx.send("Looks like you don't have permission to run this command... nice try :smiling_imp:", ephemeral=True)
 
 #close {{{1
-@bot.slash_command(description="Close a ticket.", guild_ids=[config['GUILD_ID']])
+@bot.slash_command(description="Close a ticket.", guild_ids=[CONFIG['GUILD_ID']])
 async def close(ctx: nc.Interaction, ticket_id: int) -> None:
 
-    with db_connection:
+    with DB_CONNECTION:
 
         user_name = ctx.user.nick if ctx.user.nick else ctx.user.global_name
 
         try:
 
-            db_cursor = db_connection.cursor()
+            db_cursor = DB_CONNECTION.cursor()
 
-            if ctx.user.get_role(config['MENTOR_ROLE_ID']) is None:
+            if ctx.user.get_role(CONFIG['MENTOR_ROLE_ID']) is None:
 
                 ticket_info_query = db_cursor.execute('SELECT closed, claimed, mentor_assigned FROM tickets WHERE id = :ticket_id AND author_id = :user_id', {'ticket_id': ticket_id, 'user_id': ctx.user.id}).fetchone()
                 
@@ -58,7 +77,7 @@ async def close(ctx: nc.Interaction, ticket_id: int) -> None:
 
                 closed, claimed, assignee = ticket_info_query
                 
-                if closed == 1:
+                if closed:
 
                     logging.warning(f'User {user_name} tried to close a ticket with ID {ticket_id}, but it is already closed.')
 
@@ -66,7 +85,9 @@ async def close(ctx: nc.Interaction, ticket_id: int) -> None:
 
                     return
 
-                if claimed == 1:
+                if claimed:
+                    # Not sure if this is right in this case, but would crash in this branch otherwise.
+                    mentor_name = user_name
 
                     await ctx.send(f'Mentor {mentor_name} has claimed this ticket. Please contact them to close it.', ephemeral=True)
 
@@ -100,7 +121,7 @@ async def close(ctx: nc.Interaction, ticket_id: int) -> None:
 
                 return
 
-            if closed == 1:
+            if closed:
 
                     logging.warning(f'Mentor {user_name} tried to close a ticket with ID {ticket_id}, but it is already closed.')
 
@@ -109,13 +130,13 @@ async def close(ctx: nc.Interaction, ticket_id: int) -> None:
                     return
 
             # if the ticket has not been claimed...
-            if claimed == 0:
+            if not claimed:
                
                 await ctx.send(f'This ticket has not been claimed. Please claim it before closing it.', ephemeral=True)
 
                 return 
             
-            mentor_channel = await ctx.guild.fetch_channel(config['MENTOR_CHANNEL_ID'])
+            mentor_channel = await ctx.guild.fetch_channel(CONFIG['MENTOR_CHANNEL_ID'])
 
             help_thread = mentor_channel.get_thread(help_thread_id)
 
@@ -145,17 +166,17 @@ async def close(ctx: nc.Interaction, ticket_id: int) -> None:
 #1}}}
         
 # claim {{{1
-@bot.slash_command(description="Claim a ticket.", guild_ids=[config['GUILD_ID']])
+@bot.slash_command(description="Claim a ticket.", guild_ids=[CONFIG['GUILD_ID']])
 @nc_app_checks.check(lambda ctx: isinstance(ctx.user, nc.Member) and ctx.guild)
-@nc_app_checks.has_role(config['MENTOR_ROLE_ID'])
+@nc_app_checks.has_role(CONFIG['MENTOR_ROLE_ID'])
 async def claim(ctx: nc.Interaction, ticket_id: int) -> None:
     
-    with db_connection:
+    with DB_CONNECTION:
         
         mentor_name = ctx.user.nick if ctx.user.nick else ctx.user.global_name
 
         try:
-            db_cursor = db_connection.cursor()
+            db_cursor = DB_CONNECTION.cursor()
 
             mentor_query = db_cursor.execute('SELECT 1 FROM mentors WHERE id = :mentor_id', {'mentor_id': ctx.user.id}).fetchone()
             
@@ -178,14 +199,14 @@ async def claim(ctx: nc.Interaction, ticket_id: int) -> None:
             
             closed, claimed, prev_assignee_name, author_id, ticket_message, author_location = ticket_query
 
-            if closed == 1:
+            if closed:
                
                 await ctx.send(f'This ticket has already been closed! :star_struck:', ephemeral=True)
 
                 return 
 
             #if ticket is already claimed...
-            if claimed == 1:
+            if claimed:
                
                 await ctx.send(f'This ticket has already been claimed by {prev_assignee_name}. Please contact them if you would like to help out.', ephemeral=True)
 
@@ -195,7 +216,7 @@ async def claim(ctx: nc.Interaction, ticket_id: int) -> None:
 
             ticket_author_name = ticket_author.nick if ticket_author.nick else ticket_author.global_name
 
-            help_channel = await ctx.guild.fetch_channel(config['HELP_CHANNEL_ID'])
+            help_channel = await ctx.guild.fetch_channel(CONFIG['HELP_CHANNEL_ID'])
 
             db_cursor.execute('UPDATE tickets SET claimed = 1, mentor_assigned_id = :mentor_id, mentor_assigned = :mentor_name WHERE id = :ticket_id', claim_params)
             
@@ -232,19 +253,19 @@ async def claim(ctx: nc.Interaction, ticket_id: int) -> None:
 
 #helpme {{{1
 #guild id just for testing
-@bot.slash_command(description="Request help from a mentor.", guild_ids=[config['GUILD_ID']])
+@bot.slash_command(description="Request help from a mentor.", guild_ids=[CONFIG['GUILD_ID']])
 #check that message is from a guild and user is a member of said guild. sort of a dumb check, but need for type safety later on.
 @nc_app_checks.check(lambda ctx: isinstance(ctx.user, nc.Member) and ctx.guild)
 async def helpme(ctx: nc.Interaction, author_location: str, ticket_message: str) -> None:
 
-    with db_connection:
+    with DB_CONNECTION:
        
         author_name = ctx.user.nick if ctx.user.nick else ctx.user.global_name #use guild nickname if available, otherwise use global name
 
         try:
-            db_cursor = db_connection.cursor()
+            db_cursor = DB_CONNECTION.cursor()
 
-            mentor_channel = await ctx.guild.fetch_channel(config['MENTOR_CHANNEL_ID'])
+            mentor_channel = await ctx.guild.fetch_channel(CONFIG['MENTOR_CHANNEL_ID'])
 
             ticket_params = { 'message': ticket_message
                             , 'author_id': ctx.user.id
@@ -283,19 +304,19 @@ async def helpme(ctx: nc.Interaction, author_location: str, ticket_message: str)
 #1}}}
 
 #view all of your tickets. {{{1
-@bot.slash_command(description="View all of your tickets.", guild_ids=[config['GUILD_ID']])
+@bot.slash_command(description="View all of your tickets.", guild_ids=[CONFIG['GUILD_ID']])
 #check that message is from a guild and user is a member of said guild. sort of a dumb check, but need for type safety later on.
 @nc_app_checks.check(lambda ctx: isinstance(ctx.user, nc.Member) and ctx.guild)
 async def mytix(ctx: nc.Interaction) -> None:
 
-    with db_connection:
+    with DB_CONNECTION:
 
         try:
 
-            db_cursor = db_connection.cursor()
+            db_cursor = DB_CONNECTION.cursor()
             
             #if user is a mentor, treat differently
-            if ctx.user.get_role(config['MENTOR_ROLE_ID']) is not None:
+            if ctx.user.get_role(CONFIG['MENTOR_ROLE_ID']) is not None:
                 tickets_query = db_cursor.execute('SELECT id, closed FROM tickets WHERE mentor_assigned_id = :mentor_id', {'mentor_id': ctx.user.id}).fetchall()
                 
                 if tickets_query == []:
@@ -304,9 +325,11 @@ async def mytix(ctx: nc.Interaction) -> None:
 
                     return
 
+                ticket_ids: Iterable[str]
+                closeds: Iterable[str]
                 ticket_ids, closeds = zip(*tickets_query)
 
-                closeds = map(lambda x: ':white_check_mark:' if x == 1 else ':no_entry:', closeds)
+                closeds = map(lambda x: ':white_check_mark:' if x else ':no_entry:', closeds)
                 ticket_ids = map(str, ticket_ids)
 
                 tickets_embed = nc.Embed(title='Your Claimed Tickets :sunglasses:', description='Use `/status` with the ticket ID for more information on a given ticket.')
@@ -327,11 +350,14 @@ async def mytix(ctx: nc.Interaction) -> None:
                     return
 
                 #get a tuple for each list of fields.
+                ticket_ids: Iterable[str]
+                claimeds: Iterable[str]
+                closeds: Iterable[str]
                 ticket_ids, claimeds, closeds = zip(*tickets_query)
            
                 #prep the data for embed.
-                claimeds = map(lambda x: ':white_check_mark:' if x == 1 else ':no_entry:', claimeds)
-                closeds = map(lambda x: ':white_check_mark:' if x == 1 else ':no_entry:', closeds)
+                claimeds = map(lambda x: ':white_check_mark:' if x else ':no_entry:', claimeds)
+                closeds = map(lambda x: ':white_check_mark:' if x else ':no_entry:', closeds)
                 ticket_ids = map(str, ticket_ids)
 
                 tickets_embed = nc.Embed(title='Your Tickets :man_dancing:', description='Use `/status` with the ticket ID for more information on a given ticket.')
@@ -352,20 +378,20 @@ async def mytix(ctx: nc.Interaction) -> None:
 #1}}}
 
 #view specific ticket details.{{{1
-@bot.slash_command(description="View the details of a specific ticket.", guild_ids=[config['GUILD_ID']])
+@bot.slash_command(description="View the details of a specific ticket.", guild_ids=[CONFIG['GUILD_ID']])
 @nc_app_checks.check(lambda ctx: isinstance(ctx.user, nc.Member) and ctx.guild)
 async def status(ctx: nc.Interaction, ticket_id: int) -> None:
 
-    with db_connection:
+    with DB_CONNECTION:
 
-        db_cursor = db_connection.cursor()
+        db_cursor = DB_CONNECTION.cursor()
 
         user_name = ctx.user.nick if ctx.user.nick else ctx.user.global_name #use guild nickname if available, otherwise use global name
 
         try:
             
             #organizer can view all tickets.
-            if ctx.user.get_role(config['ORGANIZER_ROLE_ID']) is not None or ctx.user.get_role(config['MENTOR_ROLE_ID']) is not None:
+            if ctx.user.get_role(CONFIG['ORGANIZER_ROLE_ID']) is not None or ctx.user.get_role(CONFIG['MENTOR_ROLE_ID']) is not None:
 
                 ticket_query = db_cursor.execute('SELECT claimed, closed, mentor_assigned, message, author, author_location FROM tickets WHERE id = :ticket_id', {'ticket_id': ticket_id}).fetchone()
 
@@ -386,8 +412,8 @@ async def status(ctx: nc.Interaction, ticket_id: int) -> None:
 
             ticket_embed = nc.Embed(title=f'Ticket #{ticket_id} :bug:', description=f'Opened by {author} @ {location}.')
             ticket_embed.add_field(name='__Mentor__ :military_helmet:', value=('N/A' if mentor is None else mentor))
-            ticket_embed.add_field(name='__Claimed__ :face_with_monocle:', value=(':white_check_mark:' if claimed == 1 else ':no_entry:'))
-            ticket_embed.add_field(name='__Closed__ :tada:', value=(':white_check_mark:' if closed == 1 else ':no_entry:'))
+            ticket_embed.add_field(name='__Claimed__ :face_with_monocle:', value=(':white_check_mark:' if claimed else ':no_entry:'))
+            ticket_embed.add_field(name='__Closed__ :tada:', value=(':white_check_mark:' if closed else ':no_entry:'))
             ticket_embed.add_field(name='__Message__ :scroll:', value=message, inline=False)
             
             await ctx.send(embed=ticket_embed, ephemeral=True)
@@ -400,15 +426,15 @@ async def status(ctx: nc.Interaction, ticket_id: int) -> None:
 #1}}}
 
 #view all open tickets {{{1 
-@bot.slash_command(description="View all open tickets.", guild_ids=[config['GUILD_ID']])
-@nc_app_checks.check(lambda ctx: ctx.user.get_role(config['MENTOR_ROLE_ID']) is not None or ctx.user.get_role(config['ORGANIZER_ROLE_ID']) is not None)
+@bot.slash_command(description="View all open tickets.", guild_ids=[CONFIG['GUILD_ID']])
+@nc_app_checks.check(lambda ctx: ctx.user.get_role(CONFIG['MENTOR_ROLE_ID']) is not None or ctx.user.get_role(CONFIG['ORGANIZER_ROLE_ID']) is not None)
 async def opentix(ctx: nc.Interaction) -> None:
 
-    with db_connection:
+    with DB_CONNECTION:
 
         try:
 
-            db_cursor = db_connection.cursor()
+            db_cursor = DB_CONNECTION.cursor()
             
             #this is an iterable
             tickets_query = db_cursor.execute('SELECT id, author_location, author, message FROM tickets WHERE claimed = 0 AND closed = 0').fetchall()
@@ -420,6 +446,9 @@ async def opentix(ctx: nc.Interaction) -> None:
                 return
 
             #get a tuple for each list of fields.
+            ticket_ids: Iterable[str]
+            logistics: Iterable[str]
+            messages: Iterable[str]
             ticket_ids, locations, authors, messages = zip(*tickets_query)
              
             #prep the data for embed.
@@ -445,15 +474,15 @@ async def opentix(ctx: nc.Interaction) -> None:
 #1}}}
 
 #view all tickets {{{1 
-@bot.slash_command(description="View all tickets.", guild_ids=[config['GUILD_ID']])
-@nc_app_checks.check(lambda ctx: ctx.user.get_role(config['MENTOR_ROLE_ID']) is not None or ctx.user.get_role(config['ORGANIZER_ROLE_ID']) is not None)
+@bot.slash_command(description="View all tickets.", guild_ids=[CONFIG['GUILD_ID']])
+@nc_app_checks.check(lambda ctx: ctx.user.get_role(CONFIG['MENTOR_ROLE_ID']) is not None or ctx.user.get_role(CONFIG['ORGANIZER_ROLE_ID']) is not None)
 async def alltix(ctx: nc.Interaction) -> None:
 
-    with db_connection:
+    with DB_CONNECTION:
 
         try:
 
-            db_cursor = db_connection.cursor()
+            db_cursor = DB_CONNECTION.cursor()
             
             #this is an iterable
             tickets_query = db_cursor.execute('SELECT id, claimed, closed FROM tickets').fetchall()
@@ -465,11 +494,14 @@ async def alltix(ctx: nc.Interaction) -> None:
                 return
 
             #get a tuple for each list of fields.
+            ticket_ids: Iterable[str]
+            claimeds: Iterable[str]
+            closeds: Iterable[str]
             ticket_ids, claimeds, closeds = zip(*tickets_query)
              
             #prep the data for embed.
-            claimeds = map(lambda x: ':white_check_mark:' if x == 1 else ':no_entry:', claimeds)
-            closeds = map(lambda x: ':white_check_mark:' if x == 1 else ':no_entry:', closeds)
+            claimeds = map(lambda x: ':white_check_mark:' if x else ':no_entry:', claimeds)
+            closeds = map(lambda x: ':white_check_mark:' if x else ':no_entry:', closeds)
             ticket_ids = map(str, ticket_ids)
 
             tickets_embed = nc.Embed(title='All Tickets :face_with_spiral_eyes:', description='Use `/status` to view information about a specific ticket if you have claimed it. Claim an open ticket with `/claim`.')
@@ -490,13 +522,13 @@ async def alltix(ctx: nc.Interaction) -> None:
 #1}}}
 
 #leaderboard {{{1
-@bot.slash_command(description="View which mentors have closed to most tickets.", guild_ids=[config['GUILD_ID']])
+@bot.slash_command(description="View which mentors have closed to most tickets.", guild_ids=[CONFIG['GUILD_ID']])
 async def leaderboard(ctx: nc.Interaction) -> None:
-    with db_connection:
+    with DB_CONNECTION:
 
         try:
 
-            db_cursor = db_connection.cursor()
+            db_cursor = DB_CONNECTION.cursor()
             
             #this is an iterable
             mentors_query = db_cursor.execute('SELECT name, tickets_claimed, tickets_closed FROM mentors ORDER BY tickets_closed DESC').fetchall()
@@ -508,6 +540,9 @@ async def leaderboard(ctx: nc.Interaction) -> None:
                 return
 
             #get a tuple for each list of fields.
+            mentors: Iterable[str]
+            num_claimed: str
+            num_closed: str
             mentors, num_claimed, num_closed = zip(*mentors_query)
              
             #prep the data for embed.
@@ -532,4 +567,4 @@ async def leaderboard(ctx: nc.Interaction) -> None:
             await ctx.send('An unknown error has occured. Please contact a HackKU organizer.', ephemeral=True)
 #1}}}
 
-bot.run(config['API_TOKEN'])
+bot.run(CONFIG['API_TOKEN'])
