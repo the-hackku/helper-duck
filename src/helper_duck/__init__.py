@@ -51,6 +51,7 @@ DB_CONNECTION: Final = sql.connect(CONFIG["DB_FILE"])
 
 @bot.event  # type: ignore[misc]
 async def on_ready() -> None:
+    """Handle ready event."""
     logging.info(f"We have logged in as {bot.user}")
 
 
@@ -59,6 +60,7 @@ async def on_application_command_error(
     ctx: nc.Interaction,
     err: Exception,
 ) -> None:
+    """Handle application command error."""
     user_name = ctx.user.nick if ctx.user.nick else ctx.user.global_name
 
     logging.warning(
@@ -76,6 +78,7 @@ async def on_application_command_error(
     guild_ids=[CONFIG["GUILD_ID"]],
 )
 async def close(ctx: nc.Interaction, ticket_id: int) -> None:
+    """Handle closing a ticket."""
     with DB_CONNECTION:
         user_name = ctx.user.nick if ctx.user.nick else ctx.user.global_name
 
@@ -262,6 +265,7 @@ def guild_member_and_in_guild(ctx: nc.Interaction) -> bool:
 @nc_app_checks.check(guild_member_and_in_guild)
 @nc_app_checks.has_role(CONFIG["MENTOR_ROLE_ID"])
 async def claim(ctx: nc.Interaction, ticket_id: int) -> None:
+    """Handle claiming a ticket."""
     with DB_CONNECTION:
         mentor_name = ctx.user.nick if ctx.user.nick else ctx.user.global_name
 
@@ -417,6 +421,7 @@ async def helpme(
     author_location: str,
     ticket_message: str,
 ) -> None:
+    """Handle help request."""
     with DB_CONNECTION:
         author_name = (
             ctx.user.nick if ctx.user.nick else ctx.user.global_name
@@ -506,6 +511,7 @@ def bool_checkmark_emoji(value: bool | int) -> str:
 # check that message is from a guild and user is a member of said guild. sort of a dumb check, but need for type safety later on.
 @nc_app_checks.check(guild_member_and_in_guild)
 async def mytix(ctx: nc.Interaction) -> None:
+    """Handle viewing all tickets from the target user."""
     with DB_CONNECTION:
         try:
             db_cursor = DB_CONNECTION.cursor()
@@ -617,6 +623,7 @@ async def mytix(ctx: nc.Interaction) -> None:
 )
 @nc_app_checks.check(guild_member_and_in_guild)
 async def status(ctx: nc.Interaction, ticket_id: int) -> None:
+    """Handle viewing the details of a given ticket."""
     with DB_CONNECTION:
         db_cursor = DB_CONNECTION.cursor()
 
@@ -709,6 +716,7 @@ def mentor_or_organizer_role(ctx: nc.Interaction) -> bool:
 )
 @nc_app_checks.check(mentor_or_organizer_role)
 async def opentix(ctx: nc.Interaction) -> None:
+    """Handle viewing all open tickets."""
     with DB_CONNECTION:
         try:
             db_cursor = DB_CONNECTION.cursor()
@@ -785,6 +793,7 @@ async def opentix(ctx: nc.Interaction) -> None:
 )
 @nc_app_checks.check(mentor_or_organizer_role)  # type: ignore[misc]
 async def alltix(ctx: nc.Interaction) -> None:
+    """Handle viewing all tickets."""
     with DB_CONNECTION:
         try:
             db_cursor = DB_CONNECTION.cursor()
@@ -853,10 +862,11 @@ async def alltix(ctx: nc.Interaction) -> None:
 
 # leaderboard {{{1
 @bot.slash_command(
-    description="View which mentors have closed to most tickets.",
+    description="View which mentors have closed the most tickets.",
     guild_ids=[CONFIG["GUILD_ID"]],
 )
 async def leaderboard(ctx: nc.Interaction) -> None:  # type: ignore[misc]
+    """Handle viewing which mentors have closed the most tickets."""
     with DB_CONNECTION:
         try:
             db_cursor = DB_CONNECTION.cursor()
@@ -927,7 +937,7 @@ async def leaderboard(ctx: nc.Interaction) -> None:  # type: ignore[misc]
 
 
 def run() -> None:
-    """Main entry point."""
+    """Run program."""
     bot.run(CONFIG["API_TOKEN"])
 
 
