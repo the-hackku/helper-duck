@@ -1,20 +1,25 @@
 """Helper-duck Discord Bot."""
 
-#  Copyright 2024 alexacallmebaka
+# Copyright 2024 alexacallmebaka
 #
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#        http://www.apache.org/licenses/LICENSE-2.0
 #
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS,
+#    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#    See the License for the specific language governing permissions and
+#    limitations under the License.
 
 from __future__ import annotations
+
+__title__ = "Helper-duck"
+__author__ = "alexacallmebaka"
+__license__ = "Apache License 2.0"
+__version__ = "0.0.0"
 
 import json
 import logging
@@ -567,4 +572,11 @@ async def leaderboard(ctx: nc.Interaction) -> None:
             await ctx.send('An unknown error has occured. Please contact a HackKU organizer.', ephemeral=True)
 #1}}}
 
-bot.run(CONFIG['API_TOKEN'])
+
+def run() -> None:
+    """Main entry point."""
+    bot.run(CONFIG['API_TOKEN'])
+
+
+if __name__ == "__main__":
+    run()
