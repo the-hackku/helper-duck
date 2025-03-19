@@ -48,7 +48,6 @@ run_helper_duck = "helper_duck:run"
 [project.optional-dependencies]
 tools = [
     "ruff>=0.11.0",
-    "codespell>=2.3.0",
     "mypy>=1.15.0",
 ]
 
