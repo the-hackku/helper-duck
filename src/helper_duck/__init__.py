@@ -50,13 +50,13 @@ DB_CONNECTION: Final = sql.connect(CONFIG["DB_FILE"])
 
 
 @bot.event  # type: ignore[misc]
-async def on_ready() -> None:
+async def on_ready() -> None:  # type: ignore[misc]
     """Handle ready event."""
     logging.info(f"We have logged in as {bot.user}")
 
 
-@bot.event
-async def on_application_command_error(
+@bot.event  # type: ignore[misc]
+async def on_application_command_error(  # type: ignore[misc]
     ctx: nc.Interaction,
     err: Exception,
 ) -> None:
@@ -73,11 +73,11 @@ async def on_application_command_error(
 
 
 # close {{{1
-@bot.slash_command(
+@bot.slash_command(  # type: ignore[misc]
     description="Close a ticket.",
     guild_ids=[CONFIG["GUILD_ID"]],
 )
-async def close(ctx: nc.Interaction, ticket_id: int) -> None:
+async def close(ctx: nc.Interaction, ticket_id: int) -> None:  # type: ignore[misc]
     """Handle closing a ticket."""
     with DB_CONNECTION:
         user_name = ctx.user.nick if ctx.user.nick else ctx.user.global_name
@@ -258,13 +258,13 @@ def guild_member_and_in_guild(ctx: nc.Interaction) -> bool:
 
 
 # claim {{{1
-@bot.slash_command(
+@bot.slash_command(  # type: ignore[misc]
     description="Claim a ticket.",
     guild_ids=[CONFIG["GUILD_ID"]],
 )
-@nc_app_checks.check(guild_member_and_in_guild)
-@nc_app_checks.has_role(CONFIG["MENTOR_ROLE_ID"])
-async def claim(ctx: nc.Interaction, ticket_id: int) -> None:
+@nc_app_checks.check(guild_member_and_in_guild)  # type: ignore[misc]
+@nc_app_checks.has_role(CONFIG["MENTOR_ROLE_ID"])  # type: ignore[misc]
+async def claim(ctx: nc.Interaction, ticket_id: int) -> None:  # type: ignore[misc]
     """Handle claiming a ticket."""
     with DB_CONNECTION:
         mentor_name = ctx.user.nick if ctx.user.nick else ctx.user.global_name
@@ -410,13 +410,13 @@ async def claim(ctx: nc.Interaction, ticket_id: int) -> None:
 
 # helpme {{{1
 # guild id just for testing
-@bot.slash_command(
+@bot.slash_command(  # type: ignore[misc]
     description="Request help from a mentor.",
     guild_ids=[CONFIG["GUILD_ID"]],
 )
 # check that message is from a guild and user is a member of said guild. sort of a dumb check, but need for type safety later on.
-@nc_app_checks.check(guild_member_and_in_guild)
-async def helpme(
+@nc_app_checks.check(guild_member_and_in_guild)  # type: ignore[misc]
+async def helpme(  # type: ignore[misc]
     ctx: nc.Interaction,
     author_location: str,
     ticket_message: str,
@@ -504,13 +504,13 @@ def bool_checkmark_emoji(value: bool | int) -> str:
 
 
 # view all of your tickets. {{{1
-@bot.slash_command(
+@bot.slash_command(  # type: ignore[misc]
     description="View all of your tickets.",
     guild_ids=[CONFIG["GUILD_ID"]],
 )
 # check that message is from a guild and user is a member of said guild. sort of a dumb check, but need for type safety later on.
-@nc_app_checks.check(guild_member_and_in_guild)
-async def mytix(ctx: nc.Interaction) -> None:
+@nc_app_checks.check(guild_member_and_in_guild)  # type: ignore[misc]
+async def mytix(ctx: nc.Interaction) -> None:  # type: ignore[misc]
     """Handle viewing all tickets from the target user."""
     with DB_CONNECTION:
         try:
@@ -617,12 +617,12 @@ async def mytix(ctx: nc.Interaction) -> None:
 
 
 # view specific ticket details.{{{1
-@bot.slash_command(
+@bot.slash_command(  # type: ignore[misc]
     description="View the details of a specific ticket.",
     guild_ids=[CONFIG["GUILD_ID"]],
 )
-@nc_app_checks.check(guild_member_and_in_guild)
-async def status(ctx: nc.Interaction, ticket_id: int) -> None:
+@nc_app_checks.check(guild_member_and_in_guild)  # type: ignore[misc]
+async def status(ctx: nc.Interaction, ticket_id: int) -> None:  # type: ignore[misc]
     """Handle viewing the details of a given ticket."""
     with DB_CONNECTION:
         db_cursor = DB_CONNECTION.cursor()
@@ -710,12 +710,12 @@ def mentor_or_organizer_role(ctx: nc.Interaction) -> bool:
 
 
 # view all open tickets {{{1
-@bot.slash_command(
+@bot.slash_command(  # type: ignore[misc]
     description="View all open tickets.",
     guild_ids=[CONFIG["GUILD_ID"]],
 )
-@nc_app_checks.check(mentor_or_organizer_role)
-async def opentix(ctx: nc.Interaction) -> None:
+@nc_app_checks.check(mentor_or_organizer_role)  # type: ignore[misc]
+async def opentix(ctx: nc.Interaction) -> None:  # type: ignore[misc]
     """Handle viewing all open tickets."""
     with DB_CONNECTION:
         try:
@@ -787,12 +787,12 @@ async def opentix(ctx: nc.Interaction) -> None:
 
 
 # view all tickets {{{1
-@bot.slash_command(
+@bot.slash_command(  # type: ignore[misc]
     description="View all tickets.",
     guild_ids=[CONFIG["GUILD_ID"]],
 )
 @nc_app_checks.check(mentor_or_organizer_role)  # type: ignore[misc]
-async def alltix(ctx: nc.Interaction) -> None:
+async def alltix(ctx: nc.Interaction) -> None:  # type: ignore[misc]
     """Handle viewing all tickets."""
     with DB_CONNECTION:
         try:
@@ -861,7 +861,7 @@ async def alltix(ctx: nc.Interaction) -> None:
 
 
 # leaderboard {{{1
-@bot.slash_command(
+@bot.slash_command(  # type: ignore[misc]
     description="View which mentors have closed the most tickets.",
     guild_ids=[CONFIG["GUILD_ID"]],
 )
