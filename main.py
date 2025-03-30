@@ -230,29 +230,51 @@ async def claim(ctx: nc.Interaction, ticket_id: int) -> None:
 
 #1}}}
 
-#helpme {{{1
-#guild id just for testing
-@bot.slash_command(description="Request help from a mentor.", guild_ids=[config['GUILD_ID']])
-#check that message is from a guild and user is a member of said guild. sort of a dumb check, but need for type safety later on.
-@nc_app_checks.check(lambda ctx: isinstance(ctx.user, nc.Member) and ctx.guild)
-async def helpme(ctx: nc.Interaction, author_location: str, ticket_message: str) -> None:
+class TicketModal(nc.ui.Modal):
+    def __init__(self):
+        super().__init__(title="Submit a ticket", custom_id="ticket_modal")
 
-    with db_connection:
-       
-        author_name = ctx.user.nick if ctx.user.nick else ctx.user.global_name #use guild nickname if available, otherwise use global name
+        self.location_input = nc.ui.TextInput(
+            label="Enter your location:",
+            placeholder="Enter details here...",
+            style=nc.TextInputStyle.paragraph,
+            required=True,
+            max_length=50,
+            custom_id="location_input"
+        )
 
+        self.issue_input = nc.ui.TextInput(
+            label="Describe your issue:",
+            placeholder="Enter details here...",
+            style=nc.TextInputStyle.paragraph,
+            required=True,
+            max_length=150,
+            custom_id="issue_input"
+        )
+
+        self.add_item(self.location_input)
+        self.add_item(self.issue_input)
+
+    async def callback(self, interaction: nc.Interaction):
+
+        author_name = interaction.user.mention
         try:
+            author_location = self.location_input.value
+
+            ticket_message = self.issue_input.value
+     
             db_cursor = db_connection.cursor()
 
-            mentor_channel = await ctx.guild.fetch_channel(config['MENTOR_CHANNEL_ID'])
-
+            mentor_channel = await interaction.guild.fetch_channel(config['MENTOR_CHANNEL_ID'])
+            
+            # should move everything below to the bot event
             ticket_params = { 'message': ticket_message
-                            , 'author_id': ctx.user.id
-                            , 'author': author_name
-                            , 'author_location': author_location
-                            , 'claimed': False
-                            , 'closed': False
-                            }
+                             , 'author_id': interaction.user.id
+                             , 'author': author_name
+                             , 'author_location': author_location
+                             , 'claimed': False
+                             , 'closed': False
+                             }
 
             db_cursor.execute("""
                             INSERT INTO tickets (message, author_id, author, author_location, claimed, closed)
@@ -262,24 +284,24 @@ async def helpme(ctx: nc.Interaction, author_location: str, ticket_message: str)
             logging.info(f'Received ticket from user {ticket_params["author"]} with ID {ticket_params["author_id"]}.')
 
             ticket_embed = nc.Embed(title='New Ticket Opened! :tickets:', description='A hacker needs help. Use `/claim` to claim this ticket!')
-            
+
             ticket_id = db_cursor.lastrowid
 
             ticket_embed.add_field(name='__ID__ :hash:', value=ticket_id)
             ticket_embed.add_field(name='__Author__ :pen_fountain:', value=author_name)
             ticket_embed.add_field(name='__Location__ :round_pushpin:', value=author_location)
             ticket_embed.add_field(name='__Message__ :scroll:', value=ticket_message, inline=False)
-            
+
             #creating a button for mentors to click
             view = nc.ui.View()
             claim_button = nc.ui.Button(label="Claim Ticket", style=nc.ButtonStyle.primary)
             close_button = nc.ui.Button(label="Close Ticket", style=nc.ButtonStyle.danger)
-                
+
             async def claim_button_callback(claim_interaction: nc.Interaction):
                 #view that only contains the close button
                 new_view = nc.ui.View()
                 new_view.add_item(close_button)
-                
+
                 #new embed that adds the message has been claimed by a mentor
                 new_embed = claim_interaction.message.embeds[0]
                 new_embed.add_field(name='__Claimed By__', value=claim_interaction.user.mention, inline=False)
@@ -292,17 +314,46 @@ async def helpme(ctx: nc.Interaction, author_location: str, ticket_message: str)
                 await close(close_interaction, ticket_id)
 
             claim_button.callback = claim_button_callback
-           
+
             close_button.callback = close_button_callback
 
             view.add_item(claim_button)
             view.add_item(close_button)
-            
+
             await mentor_channel.send(embed=ticket_embed, view=view)
 
-            await ctx.send(f'Ticket submitted with ID {ticket_id}, help will be on the way soon!', ephemeral=True)
+            await interaction.response.edit_message(content=f'Ticket submitted with ID {ticket_id}, help will be on the way soon!', view=None)
+        except Exception as e:
 
+            logging.error(f'User {author_name} with ID {interaction.user.id} tried to create a ticket, but an unexpected error occured: {e}' )
 
+            await interaction.response.send('An unknown error has occured. Please contact a HackKU organizer.', ephemeral=True)
+
+#helpme {{{1
+#guild id just for testing
+@bot.slash_command(description="Request help from a mentor.", guild_ids=[config['GUILD_ID']])
+#check that message is from a guild and user is a member of said guild. sort of a dumb check, but need for type safety later on.
+@nc_app_checks.check(lambda ctx: isinstance(ctx.user, nc.Member) and ctx.guild)
+async def helpme(ctx: nc.Interaction) -> None:
+
+    with db_connection:
+       
+        author_name = ctx.user.nick if ctx.user.nick else ctx.user.global_name #use guild nickname if available, otherwise use global name
+
+        try:
+
+            modal_view = nc.ui.View()
+            modal_button = nc.ui.Button(label="Open Issue", style=nc.ButtonStyle.primary)
+                       
+            async def modal_button_callback(modal_interaction: nc.Interaction):
+                await modal_interaction.response.send_modal(TicketModal())     
+
+            modal_button.callback = modal_button_callback
+
+            modal_view.add_item(modal_button)
+
+            await ctx.send('Please press this button to fill out your problem: ', view=modal_view,ephemeral=True)
+            
         except Exception as e:
 
             logging.error(f'User {author_name} with ID {ctx.user.id} tried to create a ticket, but an unexpected error occured: {e}' )
