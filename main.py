@@ -269,8 +269,36 @@ async def helpme(ctx: nc.Interaction, author_location: str, ticket_message: str)
             ticket_embed.add_field(name='__Author__ :pen_fountain:', value=author_name)
             ticket_embed.add_field(name='__Location__ :round_pushpin:', value=author_location)
             ticket_embed.add_field(name='__Message__ :scroll:', value=ticket_message, inline=False)
+            
+            #creating a button for mentors to click
+            view = nc.ui.View()
+            claim_button = nc.ui.Button(label="Claim Ticket", style=nc.ButtonStyle.primary)
+            close_button = nc.ui.Button(label="Close Ticket", style=nc.ButtonStyle.danger)
+                
+            async def claim_button_callback(claim_interaction: nc.Interaction):
+                #view that only contains the close button
+                new_view = nc.ui.View()
+                new_view.add_item(close_button)
+                
+                #new embed that adds the message has been claimed by a mentor
+                new_embed = claim_interaction.message.embeds[0]
+                new_embed.add_field(name='__Claimed By__', value=claim_interaction.user.mention, inline=False)
 
-            await mentor_channel.send(embed=ticket_embed)
+                await claim_interaction.response.edit_message(embed=new_embed, view=new_view)
+                await claim(claim_interaction, ticket_id)
+
+            async def close_button_callback(close_interaction: nc.Interaction):
+                await close_interaction.response.edit_message(view=None)
+                await close(close_interaction, ticket_id)
+
+            claim_button.callback = claim_button_callback
+           
+            close_button.callback = close_button_callback
+
+            view.add_item(claim_button)
+            view.add_item(close_button)
+            
+            await mentor_channel.send(embed=ticket_embed, view=view)
 
             await ctx.send(f'Ticket submitted with ID {ticket_id}, help will be on the way soon!', ephemeral=True)
 
