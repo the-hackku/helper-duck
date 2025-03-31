@@ -76,7 +76,7 @@ async def close(ctx: nc.Interaction, ticket_id: int) -> None:
                 
                 logging.info(f'User {user_name} closed thier own ticket with ID {ticket_id}.')
 
-                await ctx.send('Ticket closed! :saluting_face:', ephemeral=True)
+                #await ctx.send('Ticket closed! :saluting_face:', ephemeral=True)
 
                 return
 
@@ -135,7 +135,7 @@ async def close(ctx: nc.Interaction, ticket_id: int) -> None:
             db_cursor.execute('UPDATE mentors SET tickets_closed = tickets_closed + 1 WHERE id = :mentor_id', {'mentor_id': ctx.user.id})
 
             logging.info(f'Ticket with ID {ticket_id} has been closed by mentor {user_name}.')
-            await ctx.send('Ticket closed!', ephemeral=True)
+            #await ctx.send('Ticket closed!', ephemeral=True)
 
         except Exception as e:
 
@@ -219,7 +219,19 @@ async def claim(ctx: nc.Interaction, ticket_id: int) -> None:
 
             await ctx.send(f'Ticket #{ticket_id} claimed by {mentor_name}!')
             
-            await help_thread.send(f'Greetings {ticket_author.mention}! {ctx.user.mention} is on the way to {author_location} to help you resolve the issue in your ticket:\n> {ticket_message}')
+            view = nc.ui.View()
+            
+            close_button = nc.ui.Button(label="Close Ticket", style=nc.ButtonStyle.danger)
+            
+            async def close_button_callback(close_interaction: nc.Interaction):
+                await close_interaction.response.edit_message(view=None)
+                await close(close_interaction, ticket_id)
+
+            close_button.callback = close_button_callback
+
+            view.add_item(close_button)
+
+            await help_thread.send(f'Greetings {ticket_author.mention}! {ctx.user.mention} is on the way to {author_location} to help you resolve the issue in your ticket:\n> {ticket_message}', view=view)
 
         except Exception as e:
 
@@ -295,30 +307,19 @@ class TicketModal(nc.ui.Modal):
             #creating a button for mentors to click
             view = nc.ui.View()
             claim_button = nc.ui.Button(label="Claim Ticket", style=nc.ButtonStyle.primary)
-            close_button = nc.ui.Button(label="Close Ticket", style=nc.ButtonStyle.danger)
 
             async def claim_button_callback(claim_interaction: nc.Interaction):
-                #view that only contains the close button
-                new_view = nc.ui.View()
-                new_view.add_item(close_button)
 
                 #new embed that adds the message has been claimed by a mentor
                 new_embed = claim_interaction.message.embeds[0]
                 new_embed.add_field(name='__Claimed By__', value=claim_interaction.user.mention, inline=False)
 
-                await claim_interaction.response.edit_message(embed=new_embed, view=new_view)
+                await claim_interaction.response.edit_message(embed=new_embed, view=None)
                 await claim(claim_interaction, ticket_id)
-
-            async def close_button_callback(close_interaction: nc.Interaction):
-                await close_interaction.response.edit_message(view=None)
-                await close(close_interaction, ticket_id)
 
             claim_button.callback = claim_button_callback
 
-            close_button.callback = close_button_callback
-
             view.add_item(claim_button)
-            view.add_item(close_button)
 
             await mentor_channel.send(embed=ticket_embed, view=view)
 
