@@ -322,8 +322,9 @@ class TicketModal(nc.ui.Modal):
             view.add_item(claim_button)
 
             await mentor_channel.send(embed=ticket_embed, view=view)
+            
+            await interaction.response.send_message(content=f'Ticket submitted with ID {ticket_id}, help will be on the way soon!', ephemeral=True)
 
-            await interaction.response.edit_message(content=f'Ticket submitted with ID {ticket_id}, help will be on the way soon!', view=None)
         except Exception as e:
 
             logging.error(f'User {author_name} with ID {interaction.user.id} tried to create a ticket, but an unexpected error occured: {e}' )
@@ -343,17 +344,19 @@ async def helpme(ctx: nc.Interaction) -> None:
 
         try:
 
-            modal_view = nc.ui.View()
-            modal_button = nc.ui.Button(label="Open Issue", style=nc.ButtonStyle.primary)
+            #modal_view = nc.ui.View()
+            #modal_button = nc.ui.Button(label="Open Issue", style=nc.ButtonStyle.primary)
                        
-            async def modal_button_callback(modal_interaction: nc.Interaction):
-                await modal_interaction.response.send_modal(TicketModal())     
+            #async def modal_button_callback(modal_interaction: nc.Interaction):
+                #await modal_interaction.response.send_modal(TicketModal())     
 
-            modal_button.callback = modal_button_callback
+            #modal_button.callback = modal_button_callback
 
-            modal_view.add_item(modal_button)
+            #modal_view.add_item(modal_button)
 
-            await ctx.send('Please press this button to fill out your problem: ', view=modal_view,ephemeral=True)
+            await ctx.response.send_modal(TicketModal())
+                        
+            #ctx.send('Please press this button to fill out your problem: ', view=modal_view,ephemeral=True)
             
         except Exception as e:
 
