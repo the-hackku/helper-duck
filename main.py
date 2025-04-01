@@ -126,7 +126,8 @@ async def close(ctx: nc.Interaction, ticket_id: int) -> None:
                 await ctx.send('An unknown error has occured. Please contact a HackKU organizer.', ephemeral=True)
 
                 return
-            
+
+            #deletes help thread, which we only want when both the user and the mentor press close.  
             await help_thread.delete()
             logging.info(f'Deleted help thread wth ID: {help_thread_id}.')
 
@@ -216,22 +217,8 @@ async def claim(ctx: nc.Interaction, ticket_id: int) -> None:
             ticket_update_params = {'help_thread_id': help_thread.id, 'ticket_id': ticket_id}
 
             db_cursor.execute('UPDATE tickets SET help_thread_id = :help_thread_id WHERE id = :ticket_id', ticket_update_params)
-
-            await ctx.send(f'Ticket #{ticket_id} claimed by {mentor_name}!')
-            
-            view = nc.ui.View()
-            
-            close_button = nc.ui.Button(label="Close Ticket", style=nc.ButtonStyle.danger)
-            
-            async def close_button_callback(close_interaction: nc.Interaction):
-                await close_interaction.response.edit_message(view=None)
-                await close(close_interaction, ticket_id)
-
-            close_button.callback = close_button_callback
-
-            view.add_item(close_button)
-
-            await help_thread.send(f'Greetings {ticket_author.mention}! {ctx.user.mention} is on the way to {author_location} to help you resolve the issue in your ticket:\n> {ticket_message}', view=view)
+                
+            await help_thread.send(f'Greetings {ticket_author.mention}! {ctx.user.mention} is on the way to {author_location} to help you resolve the issue in your ticket:\n> {ticket_message}')
 
         except Exception as e:
 
@@ -245,7 +232,7 @@ async def claim(ctx: nc.Interaction, ticket_id: int) -> None:
 class TicketModal(nc.ui.Modal):
     def __init__(self):
         super().__init__(title="Submit a ticket", custom_id="ticket_modal")
-
+        
         self.location_input = nc.ui.TextInput(
             label="Enter your location:",
             placeholder="Enter details here...",
@@ -264,8 +251,18 @@ class TicketModal(nc.ui.Modal):
             custom_id="issue_input"
         )
 
+        self.ripple_input = nc.ui.TextInput(
+            label="Is this a Ripple specific question? (Yes/No)",
+            placeholder="No",
+            style=nc.TextInputStyle.short,
+            required=False,
+            max_length=3,
+            custom_id="ripple_input"
+        )
+        
         self.add_item(self.location_input)
         self.add_item(self.issue_input)
+        self.add_item(self.ripple_input)
 
     async def callback(self, interaction: nc.Interaction):
 
@@ -274,7 +271,9 @@ class TicketModal(nc.ui.Modal):
             author_location = self.location_input.value
 
             ticket_message = self.issue_input.value
-     
+            
+            is_ripple_string = self.ripple_input.value
+
             db_cursor = db_connection.cursor()
 
             mentor_channel = await interaction.guild.fetch_channel(config['MENTOR_CHANNEL_ID'])
@@ -295,36 +294,60 @@ class TicketModal(nc.ui.Modal):
 
             logging.info(f'Received ticket from user {ticket_params["author"]} with ID {ticket_params["author_id"]}.')
 
-            ticket_embed = nc.Embed(title='New Ticket Opened! :tickets:', description='A hacker needs help. Use `/claim` to claim this ticket!')
+            ticket_embed = nc.Embed(title='New Ticket Opened! :tickets:', description='A hacker needs help. Press the claim button below!')
 
             ticket_id = db_cursor.lastrowid
 
-            ticket_embed.add_field(name='__ID__ :hash:', value=ticket_id)
-            ticket_embed.add_field(name='__Author__ :pen_fountain:', value=author_name)
-            ticket_embed.add_field(name='__Location__ :round_pushpin:', value=author_location)
+            ticket_embed.add_field(name='__ID__ :hash:', value=ticket_id, inline=True)
+            ticket_embed.add_field(name='__Author__ :pen_fountain:', value=author_name, inline=True)
+            
+            ticket_embed.add_field(name='__Location__ :round_pushpin:', value=author_location, inline=True) 
+            ticket_embed.add_field(name='__Ripple__:stop_button:', value="✅" if is_ripple_string.lower() == "yes" else "❌", inline=True)
+            
             ticket_embed.add_field(name='__Message__ :scroll:', value=ticket_message, inline=False)
-
+            
             #creating a button for mentors to click
-            view = nc.ui.View()
+            claim_view = nc.ui.View()
+            close_view = nc.ui.View()
+            
             claim_button = nc.ui.Button(label="Claim Ticket", style=nc.ButtonStyle.primary)
 
-            async def claim_button_callback(claim_interaction: nc.Interaction):
+            close_button = nc.ui.Button(label="Close Ticket", style=nc.ButtonStyle.danger)
+            
+            close_view.add_item(close_button)
 
+            claim_view.add_item(claim_button)            
+
+            async def claim_button_callback(claim_interaction: nc.Interaction):
+                
                 #new embed that adds the message has been claimed by a mentor
                 new_embed = claim_interaction.message.embeds[0]
                 new_embed.add_field(name='__Claimed By__', value=claim_interaction.user.mention, inline=False)
+                new_embed.title = "Ticket has been claimed!"
+                new_embed.description = "Please close the ticket by pressing the button below when the issue is resolved"
+                
+                await claim_interaction.response.edit_message(embed=new_embed, view=close_view)
+                await claim(claim_interaction, ticket_id) 
+            
+            async def close_button_callback(close_interaction: nc.Interaction):
+                
+                #new embed that message has been closed.
+                new_embed = close_interaction.message.embeds[0]
+                new_embed.title = "Ticket has been closed!"
+                new_embed.description = "Thank you for helping the hacker!"
 
-                await claim_interaction.response.edit_message(embed=new_embed, view=None)
-                await claim(claim_interaction, ticket_id)
+                await close_interaction.response.edit_message(embed=new_embed, view=None)               
+                
+                await close(close_interaction, ticket_id)
 
             claim_button.callback = claim_button_callback
 
-            view.add_item(claim_button)
+            close_button.callback = close_button_callback
 
-            await mentor_channel.send(embed=ticket_embed, view=view)
+            await mentor_channel.send(embed=ticket_embed, view=claim_view)
             
             await interaction.response.send_message(content=f'Ticket submitted with ID {ticket_id}, help will be on the way soon!', ephemeral=True)
-
+        
         except Exception as e:
 
             logging.error(f'User {author_name} with ID {interaction.user.id} tried to create a ticket, but an unexpected error occured: {e}' )
