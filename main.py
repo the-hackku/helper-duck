@@ -33,7 +33,7 @@ async def on_application_command_error(ctx: nc.Interaction, err: Exception):
     await ctx.send("Looks like you don't have permission to run this command... nice try :smiling_imp:", ephemeral=True)
 
 #close {{{1
-@bot.slash_command(description="Close a ticket.", guild_ids=[config['GUILD_ID']])
+#@bot.slash_command(description="Close a ticket.", guild_ids=[config['GUILD_ID']])
 async def close(ctx: nc.Interaction, ticket_id: int) -> None:
 
     with db_connection:
@@ -128,8 +128,12 @@ async def close(ctx: nc.Interaction, ticket_id: int) -> None:
                 return
 
             #deletes help thread, which we only want when both the user and the mentor press close.  
-            await help_thread.delete()
-            logging.info(f'Deleted help thread wth ID: {help_thread_id}.')
+            #await help_thread.delete()
+            
+            await help_thread.remove_user(ctx.user)
+            await help_thread.send("Ticket has been closed, and mentor has been removed from the help thread")
+
+            logging.info(f'Removed mentor from help thread wth ID: {help_thread_id}.')
 
             db_cursor.execute('UPDATE tickets SET closed = 1 WHERE id = :ticket_id', {'ticket_id': ticket_id})
             
@@ -146,9 +150,9 @@ async def close(ctx: nc.Interaction, ticket_id: int) -> None:
 #1}}}
         
 # claim {{{1
-@bot.slash_command(description="Claim a ticket.", guild_ids=[config['GUILD_ID']])
-@nc_app_checks.check(lambda ctx: isinstance(ctx.user, nc.Member) and ctx.guild)
-@nc_app_checks.has_role(config['MENTOR_ROLE_ID'])
+#@bot.slash_command(description="Claim a ticket.", guild_ids=[config['GUILD_ID']])
+#@nc_app_checks.check(lambda ctx: isinstance(ctx.user, nc.Member) and ctx.guild)
+#@nc_app_checks.has_role(config['MENTOR_ROLE_ID'])
 async def claim(ctx: nc.Interaction, ticket_id: int) -> None:
     
     with db_connection:
@@ -320,6 +324,7 @@ class TicketModal(nc.ui.Modal):
 
             async def claim_button_callback(claim_interaction: nc.Interaction):
                 
+                
                 #new embed that adds the message has been claimed by a mentor
                 new_embed = claim_interaction.message.embeds[0]
                 new_embed.add_field(name='__Claimed By__', value=claim_interaction.user.mention, inline=False)
@@ -331,12 +336,21 @@ class TicketModal(nc.ui.Modal):
             
             async def close_button_callback(close_interaction: nc.Interaction):
                 
+                #query database for the close information
+
+                ticket_info_query = db_cursor.execute('SELECT closed, mentor_assigned_id, mentor_assigned, claimed, help_thread_id FROM tickets WHERE id = :ticket_id', {'ticket_id': ticket_id}).fetchone()
+                
+                _, ticket_assignee_id, _ ,_ ,_ = ticket_info_query
+
                 #new embed that message has been closed.
                 new_embed = close_interaction.message.embeds[0]
                 new_embed.title = "Ticket has been closed!"
-                new_embed.description = "Thank you for helping the hacker!"
-
-                await close_interaction.response.edit_message(embed=new_embed, view=None)               
+                new_embed.description = "Thank you for helping the hacker!" 
+            
+                if close_interaction.user.id != ticket_assignee_id: 
+                    pass
+                else: 
+                    await close_interaction.response.edit_message(embed=new_embed, view=None)               
                 
                 await close(close_interaction, ticket_id)
 
