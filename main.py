@@ -239,7 +239,7 @@ class TicketModal(nc.ui.Modal):
         
         self.location_input = nc.ui.TextInput(
             label="Enter your location:",
-            placeholder="Enter details here...",
+            placeholder="(e.g LEEP2 Study Area, Eaton 1010, Learned 3151)",
             style=nc.TextInputStyle.paragraph,
             required=True,
             max_length=50,
@@ -248,7 +248,7 @@ class TicketModal(nc.ui.Modal):
 
         self.issue_input = nc.ui.TextInput(
             label="Describe your issue:",
-            placeholder="Enter details here...",
+            placeholder="(e.g website not rendering, null object, stack overflow)",
             style=nc.TextInputStyle.paragraph,
             required=True,
             max_length=150,
