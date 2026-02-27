@@ -532,4 +532,48 @@ async def leaderboard(ctx: nc.Interaction) -> None:
             await ctx.send('An unknown error has occured. Please contact a HackKU organizer.', ephemeral=True)
 #1}}}
 
+@bot.event
+async def on_raw_reaction_add(payload: nc.RawReactionActionEvent): # emoji based verification system
+    if payload.message_id == config["WELCOME_MESSAGE_ID"]: # if the added reaction is on our welcome message
+        # Note: WELCOME_MESSAGE_ID is something manually set in the config.json
+        guild = bot.get_guild(payload.guild_id) # Get the guild the reaction was sent in, should only ever be HackKU
+        member = await guild.fetch_member(payload.user_id) # get the member who made the reaction
+
+        # # Just to test to make sure the welcome message is configured correctly
+        # print(member)
+        # print(f"{member.id} Added a {payload.emoji} reaction")
+        # print(str(payload.emoji))
+
+        if str(payload.emoji) == "💻":  # If reacted with :computer:
+            await give_role(member, guild, "Hacker") # give them the appropriate role
+
+        if str(payload.emoji) == "🧑‍⚖️": # :judge:
+            await give_role(member, guild, "Judge")
+
+        if str(payload.emoji) == "🧑‍🚒": # :firefighter:
+            await give_role(member, guild, "Mentor")
+
+        if str(payload.emoji) == "🧑‍💼": # :office_worker:
+            await give_role(member, guild, "Sponsor")
+
+    else:
+        pass
+
+
+async def give_role(member, guild, role_name):
+    # step 1: find the Role class that has the role name
+    # Step 2: make sure that member has only that role (No doubles)
+    user_roles = []
+    for temp_role_name in ["Hacker", "Judge", "Mentor", "Sponsor"]:
+        user_roles.append(nc.utils.get(guild.roles, name=temp_role_name))
+
+    for mem_role in member.roles:
+        if mem_role in user_roles: # if the member already has one of our 4 relavent roles
+            await member.remove_roles(mem_role) # remove that non-requested role
+            # TODO: make a audit log to show who has switched roles to catch Hackers quickly switching roles for an unfair advantage
+
+    await member.add_roles(nc.utils.get(guild.roles, name=role_name)) # gives the user the requested role
+
+
+
 bot.run(config['API_TOKEN'])
