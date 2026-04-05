@@ -25,7 +25,9 @@ else:
         raise Exception("No config found")
     config = json.loads(config_json_string)
 
-bot = nc_cmd.Bot()
+intents = nc.Intents.default()
+intents.message_content = True
+bot = nc_cmd.Bot(intents=intents)
 
 db_connection = sql.connect(config['DB_FILE'])
 
@@ -583,6 +585,30 @@ async def give_role(member, guild, role_name):
 
     await member.add_roles(nc.utils.get(guild.roles, name=role_name)) # gives the user the requested role
 
+@bot.event
+async def counting_game(message: nc.message.Message):
+    global current_count, last_user_id, high_score
+    
+    if message.author.bot or message.channel.id != config['COUNTING_CHANNEL_ID']:
+        pass
+    
+    if message.content.isdigit():
+        current_num = int(message.content)
+
+        if current_num == current_count + 1 and message.author.id != last_user_id:
+            current_count += 1
+            if current_count > high_score:
+                high_score = current_count
+            last_user_id = message.author.id
+            await message.add_reaction('✅')
+        else:
+            if message.author.id != last_user_id:
+                message.reply("**No double-posting!**\nCount reset.")
+            elif current_num != current_count + 1:
+                message.reply(f"Wrong number! The correct number was **{current_count + 1}**.\nHigh score: **{high_score}**\nCount reset.")
+            current_count = 1
+            await message.add_reaction('❌')
+    await bot.process_commands(message) 
 
 
 bot.run(config['API_TOKEN'])
