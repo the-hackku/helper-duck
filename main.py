@@ -590,7 +590,7 @@ async def counting_game(message: nc.message.Message):
     global current_count, last_user_id, high_score
     
     if message.author.bot or message.channel.id != config['COUNTING_CHANNEL_ID']:
-        pass
+        return
     
     if message.content.isdigit():
         current_num = int(message.content)
