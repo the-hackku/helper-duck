@@ -1,5 +1,7 @@
 #TODO: add types
 
+from os import getenv
+from os.path import isfile
 import nextcord as nc
 from nextcord.ext import commands as nc_cmd
 import nextcord.utils as nc_utils
@@ -13,9 +15,22 @@ logging.basicConfig(level=logging.INFO)
 
 logger = logging.getLogger('nextcord')
 
-with open('config.json') as jsonfile:
-    config = json.load(jsonfile)
+# Load the config.json file
 
+
+if isfile('config.json'):
+
+
+    with open('config.json') as jsonfile:
+
+
+        config = json.load(jsonfile)
+# Load config from an environment variable
+else:
+    config_json_string = getenv("HELPER_DUCK_CONFIG")
+    if config_json_string is None:
+        raise Exception("No config found")
+    config = json.loads(config_json_string)
 bot = nc_cmd.Bot()
 
 db_connection = sql.connect(config['DB_FILE'])
