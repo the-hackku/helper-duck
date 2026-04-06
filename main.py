@@ -1,7 +1,5 @@
 #TODO: add types
 
-from os import getenv
-from os.path import isfile
 import nextcord as nc
 from nextcord.ext import commands as nc_cmd
 import nextcord.utils as nc_utils
@@ -12,18 +10,11 @@ import sqlite3 as sql
 import json
 
 logging.basicConfig(level=logging.INFO)
+
 logger = logging.getLogger('nextcord')
 
-# Load the config.json file
-if isfile('config.json'):
-    with open('config.json') as jsonfile:
-        config = json.load(jsonfile)
-# Load config from an environment variable
-else:
-    config_json_string = getenv("HELPER_DUCK_CONFIG")
-    if config_json_string is None:
-        raise Exception("No config found")
-    config = json.loads(config_json_string)
+with open('config.json') as jsonfile:
+    config = json.load(jsonfile)
 
 bot = nc_cmd.Bot()
 
@@ -553,16 +544,16 @@ async def on_raw_reaction_add(payload: nc.RawReactionActionEvent): # emoji based
         # print(f"{member.id} Added a {payload.emoji} reaction")
         # print(str(payload.emoji))
 
-        if str(payload.emoji) == "💻":  # If reacted with :computer:
+        if payload.emoji == next((u for u in guild.emojis if u.name == "mascot_hacker")):  # If reacted with custom guild emoji "mascot_hacker"
             await give_role(member, guild, "Hacker") # give them the appropriate role
 
-        if str(payload.emoji) == "🧑‍⚖️": # :judge:
+        if payload.emoji == next((u for u in guild.emojis if u.name == "mascot_judge")):
             await give_role(member, guild, "Judge")
 
-        if str(payload.emoji) == "🧑‍🚒": # :firefighter:
+        if payload.emoji == next((u for u in guild.emojis if u.name == "mascot_mentor")):
             await give_role(member, guild, "Mentor")
 
-        if str(payload.emoji) == "🧑‍💼": # :office_worker:
+        if payload.emoji == next((u for u in guild.emojis if u.name == "mascot_sponsor")):
             await give_role(member, guild, "Sponsor")
 
     else:
