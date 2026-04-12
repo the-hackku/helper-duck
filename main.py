@@ -585,29 +585,43 @@ async def give_role(member, guild, role_name):
 
     await member.add_roles(nc.utils.get(guild.roles, name=role_name)) # gives the user the requested role
 
+# variables for the counting game
+current_num = 0
+last_user_id = None
+high_score = 0
+
+# reads new messages sent to server
+# strictly for purposes of counting game; only acts if message was sent by a non-bot user in the counting channel
 @bot.event
-async def counting_game(message: nc.message.Message):
-    global current_count, last_user_id, high_score
+async def on_message(message: nc.message.Message):
+    # establishes that global variables are being used
+    global current_num, last_user_id, high_score
     
+    # if not in counting channel and/or sent by bot, ignore
     if message.author.bot or message.channel.id != config['COUNTING_CHANNEL_ID']:
         return
     
+    # if message content is not strictly a number, ignore
     if message.content.isdigit():
-        current_num = int(message.content)
+        message_num = int(message.content)
 
-        if current_num == current_count + 1 and message.author.id != last_user_id:
-            current_count += 1
-            if current_count > high_score:
-                high_score = current_count
+        # if number is equal to last numeric message + 1 and is sent by a different author than the last message, keep going and react with a checkmark
+        # (also keeps track of high score)
+        if message_num == current_num + 1:
+            current_num += 1
+            if current_num > high_score:
+                high_score = current_num
             last_user_id = message.author.id
             await message.add_reaction('✅')
+        # otherwise, reset count, reply with message detailing to user what they did wrong, and react with an X
         else:
             if message.author.id != last_user_id:
-                message.reply("**No double-posting!**\nCount reset.")
-            elif current_num != current_count + 1:
-                message.reply(f"Wrong number! The correct number was **{current_count + 1}**.\nHigh score: **{high_score}**\nCount reset.")
-            current_count = 1
+                await message.reply("**No double-posting!**\nCount reset.")
+            elif message_num != current_num + 1:
+                await message.reply(f"Wrong number! The correct number was **{current_num + 1}**.\nHigh score: **{high_score}**\nCount reset.")
+            current_num = 0
             await message.add_reaction('❌')
+    # onto next message
     await bot.process_commands(message) 
 
 
