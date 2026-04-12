@@ -27,3 +27,6 @@ known-first-party = ["helper_duck"]
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
+
+[tool.pyrefly]
+infer-with-first-use = false

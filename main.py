@@ -4,15 +4,15 @@ from os import getenv
 
 import nextcord as nc
 import requests
+from dotenv import load_dotenv
 from nextcord.ext import application_checks as nc_app_checks
 from nextcord.ext import commands as nc_cmd
-from dotenv import load_dotenv
 
 # Find a load a .env file
 load_dotenv()
 
+# Setup logging
 logging.basicConfig(level=logging.INFO)
-
 logger = logging.getLogger("nextcord")
 
 
@@ -44,7 +44,6 @@ db_connection: sql.Connection = sql.connect(DB_FILE)
 
 announcement_ids: dict[int, str] = {}
 
-
 @bot.event
 async def on_ready() -> None:
     logging.info(f"We have logged in as {bot.user}")
@@ -52,8 +51,10 @@ async def on_ready() -> None:
 
 @bot.event
 async def on_application_command_error(ctx: nc.Interaction, err: Exception) -> None:
+    if ctx.user is None or ctx.application_command is None:
+        return
 
-    user_name = ctx.user.nick if ctx.user.nick else ctx.user.global_name
+    user_name = ctx.user.nick if isinstance(ctx.user, nc.Member) and ctx.user.nick else ctx.user.global_name
 
     logging.warning(
         f"User {user_name} tried to execute {ctx.application_command.qualified_name} but does not have permission to do so."
@@ -64,6 +65,8 @@ async def on_application_command_error(ctx: nc.Interaction, err: Exception) -> N
 # close {{{1
 @bot.slash_command(description="Close a ticket.", guild_ids=[GUILD_ID])
 async def close(ctx: nc.Interaction, ticket_id: int) -> None:
+    if not isinstance(ctx.user, nc.Member) or ctx.guild is None:
+        return
 
     with db_connection:
         user_name = ctx.user.nick if ctx.user.nick else ctx.user.global_name
@@ -102,7 +105,7 @@ async def close(ctx: nc.Interaction, ticket_id: int) -> None:
 
                 if claimed == 1:
                     await ctx.send(
-                        f"Mentor {mentor_name} has claimed this ticket. Please contact them to close it.",
+                        f"Mentor {assignee} has claimed this ticket. Please contact them to close it.",
                         ephemeral=True,
                     )
 
@@ -153,11 +156,15 @@ async def close(ctx: nc.Interaction, ticket_id: int) -> None:
 
             # if the ticket has not been claimed...
             if claimed == 0:
-                await ctx.send(f"This ticket has not been claimed. Please claim it before closing it.", ephemeral=True)
+                await ctx.send("This ticket has not been claimed. Please claim it before closing it.", ephemeral=True)
 
                 return
 
             mentor_channel = await ctx.guild.fetch_channel(MENTOR_CHANNEL_ID)
+
+            if not isinstance(mentor_channel, nc.TextChannel):
+                await ctx.send("An unknown error has occured. Please contact a HackKU organizer.", ephemeral=True)
+                return
 
             help_thread = mentor_channel.get_thread(help_thread_id)
 
@@ -196,9 +203,11 @@ async def close(ctx: nc.Interaction, ticket_id: int) -> None:
 
 # claim {{{1
 @bot.slash_command(description="Claim a ticket.", guild_ids=[GUILD_ID])
-@nc_app_checks.check(lambda ctx: isinstance(ctx.user, nc.Member) and ctx.guild)
+@nc_app_checks.check(lambda ctx: isinstance(ctx.user, nc.Member) and ctx.guild)  # type: ignore[arg-type]
 @nc_app_checks.has_role(MENTOR_ROLE_ID)
 async def claim(ctx: nc.Interaction, ticket_id: int) -> None:
+    assert isinstance(ctx.user, nc.Member)
+    assert ctx.guild is not None
 
     with db_connection:
         mentor_name = ctx.user.nick if ctx.user.nick else ctx.user.global_name
@@ -234,7 +243,7 @@ async def claim(ctx: nc.Interaction, ticket_id: int) -> None:
             closed, claimed, prev_assignee_name, author_id, ticket_message, author_location = ticket_query
 
             if closed == 1:
-                await ctx.send(f"This ticket has already been closed! :star_struck:", ephemeral=True)
+                await ctx.send("This ticket has already been closed! :star_struck:", ephemeral=True)
 
                 return
 
@@ -252,6 +261,10 @@ async def claim(ctx: nc.Interaction, ticket_id: int) -> None:
             ticket_author_name = ticket_author.nick if ticket_author.nick else ticket_author.global_name
 
             help_channel = await ctx.guild.fetch_channel(HELP_CHANNEL_ID)
+
+            if not isinstance(help_channel, nc.TextChannel):
+                await ctx.send("An unknown error has occured. Please contact a HackKU organizer.", ephemeral=True)
+                return
 
             db_cursor.execute(
                 "UPDATE tickets SET claimed = 1, mentor_assigned_id = :mentor_id, mentor_assigned = :mentor_name WHERE id = :ticket_id",
@@ -302,18 +315,24 @@ async def claim(ctx: nc.Interaction, ticket_id: int) -> None:
 # guild id just for testing
 @bot.slash_command(description="Request help from a mentor.", guild_ids=[GUILD_ID])
 # check that message is from a guild and user is a member of said guild. sort of a dumb check, but need for type safety later on.
-@nc_app_checks.check(lambda ctx: isinstance(ctx.user, nc.Member) and ctx.guild)
+@nc_app_checks.check(lambda ctx: isinstance(ctx.user, nc.Member) and ctx.guild)  # type: ignore[arg-type]
 async def helpme(ctx: nc.Interaction, author_location: str, ticket_message: str) -> None:
+    assert isinstance(ctx.user, nc.Member)
+    assert ctx.guild is not None
 
     with db_connection:
-        author_name = (
-            ctx.user.nick if ctx.user.nick else ctx.user.global_name
+        author_name: str = (
+            ctx.user.nick if ctx.user.nick else (ctx.user.global_name or ctx.user.name)
         )  # use guild nickname if available, otherwise use global name
 
         try:
             db_cursor = db_connection.cursor()
 
             mentor_channel = await ctx.guild.fetch_channel(MENTOR_CHANNEL_ID)
+
+            if not isinstance(mentor_channel, nc.TextChannel):
+                await ctx.send("An unknown error has occured. Please contact a HackKU organizer.", ephemeral=True)
+                return
 
             ticket_params = {
                 "message": ticket_message,
@@ -341,7 +360,7 @@ async def helpme(ctx: nc.Interaction, author_location: str, ticket_message: str)
 
             ticket_id = db_cursor.lastrowid
 
-            ticket_embed.add_field(name="__ID__ :hash:", value=ticket_id)
+            ticket_embed.add_field(name="__ID__ :hash:", value=str(ticket_id) if ticket_id is not None else "N/A")
             ticket_embed.add_field(name="__Author__ :pen_fountain:", value=author_name)
             ticket_embed.add_field(name="__Location__ :round_pushpin:", value=author_location)
             ticket_embed.add_field(name="__Message__ :scroll:", value=ticket_message, inline=False)
@@ -364,8 +383,10 @@ async def helpme(ctx: nc.Interaction, author_location: str, ticket_message: str)
 # view all of your tickets. {{{1
 @bot.slash_command(description="View all of your tickets.", guild_ids=[GUILD_ID])
 # check that message is from a guild and user is a member of said guild. sort of a dumb check, but need for type safety later on.
-@nc_app_checks.check(lambda ctx: isinstance(ctx.user, nc.Member) and ctx.guild)
+@nc_app_checks.check(lambda ctx: isinstance(ctx.user, nc.Member) and ctx.guild)  # type: ignore[arg-type]
 async def mytix(ctx: nc.Interaction) -> None:
+    assert isinstance(ctx.user, nc.Member)
+    assert ctx.guild is not None
 
     with db_connection:
         try:
@@ -444,8 +465,10 @@ async def mytix(ctx: nc.Interaction) -> None:
 
 # view specific ticket details.{{{1
 @bot.slash_command(description="View the details of a specific ticket.", guild_ids=[GUILD_ID])
-@nc_app_checks.check(lambda ctx: isinstance(ctx.user, nc.Member) and ctx.guild)
+@nc_app_checks.check(lambda ctx: isinstance(ctx.user, nc.Member) and ctx.guild)  # type: ignore[arg-type]
 async def status(ctx: nc.Interaction, ticket_id: int) -> None:
+    assert isinstance(ctx.user, nc.Member)
+    assert ctx.guild is not None
 
     with db_connection:
         db_cursor = db_connection.cursor()
@@ -509,7 +532,7 @@ async def status(ctx: nc.Interaction, ticket_id: int) -> None:
 # view all open tickets {{{1
 @bot.slash_command(description="View all open tickets.", guild_ids=[GUILD_ID])
 @nc_app_checks.check(
-    lambda ctx: ctx.user.get_role(MENTOR_ROLE_ID) is not None or ctx.user.get_role(ORGANIZER_ROLE_ID) is not None
+    lambda ctx: ctx.user.get_role(MENTOR_ROLE_ID) is not None or ctx.user.get_role(ORGANIZER_ROLE_ID) is not None  # type: ignore[union-attr]
 )
 async def opentix(ctx: nc.Interaction) -> None:
 
@@ -550,7 +573,7 @@ async def opentix(ctx: nc.Interaction) -> None:
 
         except Exception as e:
             user_name = (
-                ctx.user.nick if ctx.user.nick else ctx.user.global_name
+                ctx.user.nick if isinstance(ctx.user, nc.Member) and ctx.user.nick else (ctx.user.global_name if ctx.user is not None else "Unknown")
             )  # use guild nickname if available, otherwise use global name
 
             logging.error(f"User {user_name} tried to view all open tickets, but an unexpected error occured: {e}")
@@ -564,7 +587,7 @@ async def opentix(ctx: nc.Interaction) -> None:
 # view all tickets {{{1
 @bot.slash_command(description="View all tickets.", guild_ids=[GUILD_ID])
 @nc_app_checks.check(
-    lambda ctx: ctx.user.get_role(MENTOR_ROLE_ID) is not None or ctx.user.get_role(ORGANIZER_ROLE_ID) is not None
+    lambda ctx: ctx.user.get_role(MENTOR_ROLE_ID) is not None or ctx.user.get_role(ORGANIZER_ROLE_ID) is not None  # type: ignore[union-attr]
 )
 async def alltix(ctx: nc.Interaction) -> None:
 
@@ -601,7 +624,7 @@ async def alltix(ctx: nc.Interaction) -> None:
 
         except Exception as e:
             user_name = (
-                ctx.user.nick if ctx.user.nick else ctx.user.global_name
+                ctx.user.nick if isinstance(ctx.user, nc.Member) and ctx.user.nick else (ctx.user.global_name if ctx.user is not None else "Unknown")
             )  # use guild nickname if available, otherwise use global name
 
             logging.error(f"User {user_name} tried to view all tickets, but an unexpected error occured: {e}")
@@ -649,7 +672,7 @@ async def leaderboard(ctx: nc.Interaction) -> None:
 
         except Exception as e:
             user_name = (
-                ctx.user.nick if ctx.user.nick else ctx.user.global_name
+                ctx.user.nick if isinstance(ctx.user, nc.Member) and ctx.user.nick else (ctx.user.global_name if ctx.user is not None else "Unknown")
             )  # use guild nickname if available, otherwise use global name
 
             logging.error(
@@ -666,7 +689,11 @@ async def leaderboard(ctx: nc.Interaction) -> None:
 async def on_raw_reaction_add(payload: nc.RawReactionActionEvent) -> None:  # emoji based verification system
     if payload.message_id == WELCOME_MESSAGE_ID:  # if the added reaction is on our welcome message
         # Note: WELCOME_MESSAGE_ID is something manually set via env var
+        if payload.guild_id is None:
+            return
         guild = bot.get_guild(payload.guild_id)  # Get the guild the reaction was sent in, should only ever be HackKU
+        if guild is None:
+            return
         member = await guild.fetch_member(payload.user_id)  # get the member who made the reaction
 
         # # Just to test to make sure the welcome message is configured correctly
@@ -675,22 +702,37 @@ async def on_raw_reaction_add(payload: nc.RawReactionActionEvent) -> None:  # em
         # print(str(payload.emoji))
 
         if payload.emoji == next(
-            (u for u in guild.emojis if u.name == "mascot_hacker")
+            u for u in guild.emojis if u.name == "mascot_hacker"
         ):  # If reacted with custom guild emoji "mascot_hacker"
             await give_role(member, guild, "Hacker")  # give them the appropriate role
 
-        if payload.emoji == next((u for u in guild.emojis if u.name == "mascot_judge")):
+        if payload.emoji == next(u for u in guild.emojis if u.name == "mascot_judge"):
             await give_role(member, guild, "Judge")
 
-        if payload.emoji == next((u for u in guild.emojis if u.name == "mascot_mentor")):
+        if payload.emoji == next(u for u in guild.emojis if u.name == "mascot_mentor"):
             await give_role(member, guild, "Mentor")
 
-        if payload.emoji == next((u for u in guild.emojis if u.name == "mascot_sponsor")):
+        if payload.emoji == next(u for u in guild.emojis if u.name == "mascot_sponsor"):
             await give_role(member, guild, "Sponsor")
 
     else:
         pass
 
+async def give_role(member: nc.Member, guild: nc.Guild, role_name: str) -> None:
+    # step 1: find the Role class that has the role name
+    # Step 2: make sure that member has only that role (No doubles)
+    user_roles = []
+    for temp_role_name in ["Hacker", "Judge", "Mentor", "Sponsor"]:
+        user_roles.append(nc.utils.get(guild.roles, name=temp_role_name))
+
+    for mem_role in member.roles:
+        if mem_role in user_roles:  # if the member already has one of our 4 relavent roles
+            await member.remove_roles(mem_role)  # remove that non-requested role
+            # TODO: make a audit log to show who has switched roles to catch Hackers quickly switching roles for an unfair advantage
+
+    role = nc.utils.get(guild.roles, name=role_name)
+    if role is not None:
+        await member.add_roles(role)  # gives the user the requested role
 
 @bot.event
 async def on_message(message: nc.Message) -> None:
@@ -762,19 +804,5 @@ async def on_message_delete(message: nc.Message) -> None:
                 )
 
 
-async def give_role(member: nc.Member, guild: nc.Guild, role_name: str) -> None:
-    # step 1: find the Role class that has the role name
-    # Step 2: make sure that member has only that role (No doubles)
-    user_roles = []
-    for temp_role_name in ["Hacker", "Judge", "Mentor", "Sponsor"]:
-        user_roles.append(nc.utils.get(guild.roles, name=temp_role_name))
-
-    for mem_role in member.roles:
-        if mem_role in user_roles:  # if the member already has one of our 4 relavent roles
-            await member.remove_roles(mem_role)  # remove that non-requested role
-            # TODO: make a audit log to show who has switched roles to catch Hackers quickly switching roles for an unfair advantage
-
-    await member.add_roles(nc.utils.get(guild.roles, name=role_name))  # gives the user the requested role
-
-
+# Run the bot
 bot.run(API_TOKEN)
