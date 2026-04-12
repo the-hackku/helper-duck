@@ -5,6 +5,11 @@ CREATE TABLE mentors(
   tickets_closed INTEGER NOT NULL
 );
 
+CREATE TABLE announcements(
+  discord_message_id INTEGER PRIMARY KEY,
+  announcement_id TEXT NOT NULL
+);
+
 CREATE TABLE tickets(
   id INTEGER PRIMARY KEY,
   message TEXT NOT NULL,

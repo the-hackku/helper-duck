@@ -42,8 +42,6 @@ bot: nc_cmd.Bot = nc_cmd.Bot(intents=intents)
 
 db_connection: sql.Connection = sql.connect(DB_FILE)
 
-announcement_ids: dict[int, str] = {}
-
 @bot.event
 async def on_ready() -> None:
     logging.info(f"We have logged in as {bot.user}")
@@ -752,7 +750,11 @@ async def on_message(message: nc.Message) -> None:
             if response.status_code != 200:
                 raise Exception(f"Received non-200 response: {response.status_code} - {response.text}")
             announcement = response.json().get("id")
-            announcement_ids[message.id] = announcement
+            with db_connection:
+                db_connection.execute(
+                    "INSERT OR REPLACE INTO announcements (discord_message_id, announcement_id) VALUES (:discord_message_id, :announcement_id)",
+                    {"discord_message_id": message.id, "announcement_id": announcement},
+                )
             logger.info(
                 f"Sent announcement from {message.author.display_name} to announcement endpoint! The announcement ID is {announcement}"
             )
@@ -764,7 +766,11 @@ async def on_message(message: nc.Message) -> None:
 async def on_message_edit(before: nc.Message, after: nc.Message) -> None:
     # Edit announcement on website if edited in the announcement channel
     if before.channel.id == ANNOUNCEMENT_CHANNEL_ID and before.author != bot.user and before.content != after.content:
-        announcement_id = announcement_ids.get(before.id)
+        row = db_connection.execute(
+            "SELECT announcement_id FROM announcements WHERE discord_message_id = :discord_message_id",
+            {"discord_message_id": before.id},
+        ).fetchone()
+        announcement_id = row[0] if row else None
         if announcement_id:
             try:
                 response = requests.patch(
@@ -785,7 +791,11 @@ async def on_message_edit(before: nc.Message, after: nc.Message) -> None:
 async def on_message_delete(message: nc.Message) -> None:
     # Delete announcement on website if deleted in the announcement channel
     if message.channel.id == ANNOUNCEMENT_CHANNEL_ID and message.author != bot.user:
-        announcement_id = announcement_ids.get(message.id)
+        row = db_connection.execute(
+            "SELECT announcement_id FROM announcements WHERE discord_message_id = :discord_message_id",
+            {"discord_message_id": message.id},
+        ).fetchone()
+        announcement_id = row[0] if row else None
         if announcement_id:
             try:
                 response = requests.delete(
@@ -795,6 +805,11 @@ async def on_message_delete(message: nc.Message) -> None:
                 )
                 if response.status_code != 200:
                     raise Exception(f"Received non-200 response: {response.status_code} - {response.text}")
+                with db_connection:
+                    db_connection.execute(
+                        "DELETE FROM announcements WHERE discord_message_id = :discord_message_id",
+                        {"discord_message_id": message.id},
+                    )
                 logger.info(
                     f"Deleted announcement with ID {announcement_id} from message deletion by {message.author.name}"
                 )
