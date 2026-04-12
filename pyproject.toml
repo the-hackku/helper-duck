@@ -1,0 +1,29 @@
+[project]
+name = "helper-duck"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "nextcord>=3.1.1",
+    "python-dotenv>=1.2.2",
+    "requests>=2.33.1",
+]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+# E: pycodestyle errors
+# F: pyflakes (undefined names, unused imports)
+# I: isort (import ordering)
+# UP: pyupgrade (modern Python syntax)
+select = ["E", "F", "I", "UP"]
+ignore = [
+    "E501",  # line too long — handled by formatter, not enforced as error
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["helper_duck"]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
