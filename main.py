@@ -1,5 +1,6 @@
 #TODO: add types
 
+from email.mime import message
 from os import getenv
 from os.path import isfile
 import nextcord as nc
@@ -10,20 +11,17 @@ from nextcord.ext import application_checks as nc_app_checks
 import logging
 import sqlite3 as sql
 import json
+import requests
 
 logging.basicConfig(level=logging.INFO)
 
 logger = logging.getLogger('nextcord')
 
+
 # Load the config.json file
 
-
 if isfile('config.json'):
-
-
     with open('config.json') as jsonfile:
-
-
         config = json.load(jsonfile)
 # Load config from an environment variable
 else:
@@ -31,9 +29,14 @@ else:
     if config_json_string is None:
         raise Exception("No config found")
     config = json.loads(config_json_string)
-bot = nc_cmd.Bot()
+
+intents = nc.Intents.default()
+intents.message_content = True
+bot = nc_cmd.Bot(intents=intents)
 
 db_connection = sql.connect(config['DB_FILE'])
+
+announcement_ids = dict()
 
 @bot.event
 async def on_ready():
@@ -574,6 +577,47 @@ async def on_raw_reaction_add(payload: nc.RawReactionActionEvent): # emoji based
     else:
         pass
 
+@bot.event
+async def on_message(message):
+    # Send announcements to the website announcement endpoint
+    if message.channel.id == config["ANNOUNCEMENT_CHANNEL_ID"] and message.author != bot.user and len(message.content) > 50:
+        try:
+            response = requests.post(config["ANNOUNCEMENT_ENDPOINT"], headers={"X-Announcement-Secret": config["ANNOUNCEMENT_SECRET"]}, json={"content": message.content, "publishedAt": message.created_at.isoformat(), "authorId": str(message.author.id), "authorName": message.author.name})
+            if response.status_code != 200:
+                raise Exception(f"Received non-200 response: {response.status_code} - {response.text}")
+            announcement = response.json().get("id")
+            announcement_ids[message.id] = announcement
+            logger.info(f"Sent announcement from {message.author.name} to announcement endpoint! The announcement ID is {announcement}")
+        except Exception as e:
+            logger.error(f"Failed to send announcement from {message.author.name}: {e}")
+
+@bot.event
+async def on_message_edit(before, after):
+    # Edit announcement on website if edited in the announcement channel
+    if before.channel.id == config["ANNOUNCEMENT_CHANNEL_ID"] and before.author != bot.user and before.content != after.content:
+        announcement_id = announcement_ids.get(before.id)
+        if announcement_id:
+            try:
+                response = requests.patch(config['ANNOUNCEMENT_ENDPOINT'], headers={"X-Announcement-Secret": config["ANNOUNCEMENT_SECRET"]}, json={"id": announcement_id, "content": after.content})
+                if response.status_code != 200:
+                    raise Exception(f"Received non-200 response: {response.status_code} - {response.text}")
+                logger.info(f"Updated announcement with ID {announcement_id} from message edit by {after.author.name}")
+            except Exception as e:
+                logger.error(f"Failed to update announcement with ID {announcement_id} from message edit by {after.author.name}: {e}")
+
+@bot.event
+async def on_message_delete(message):
+    # Delete announcement on website if deleted in the announcement channel
+    if message.channel.id == config["ANNOUNCEMENT_CHANNEL_ID"] and message.author != bot.user:
+        announcement_id = announcement_ids.get(message.id)
+        if announcement_id:
+            try:
+                response = requests.delete(config['ANNOUNCEMENT_ENDPOINT'], headers={"X-Announcement-Secret": config["ANNOUNCEMENT_SECRET"]}, json={"id": announcement_id})
+                if response.status_code != 200:
+                    raise Exception(f"Received non-200 response: {response.status_code} - {response.text}")
+                logger.info(f"Deleted announcement with ID {announcement_id} from message deletion by {message.author.name}")
+            except Exception as e:
+                logger.error(f"Failed to delete announcement with ID {announcement_id} from message deletion by {message.author.name}: {e}")
 
 async def give_role(member, guild, role_name):
     # step 1: find the Role class that has the role name

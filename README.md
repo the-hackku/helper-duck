@@ -18,12 +18,15 @@ Next, you will need to configure helper duck. Create a file named `config.json` 
 ```
 {
   "DB_FILE": "<name of database file from above>",
+  "ANNOUNCEMENT_ENDPOINT": "<endpoint to send announcements to>",
   "MENTOR_CHANNEL_ID": <mentor private channel id from discord>,
   "HELP_CHANNEL_ID": <channel for helper duck to create threads in>,
+  "ANNOUNCEMENT_CHANNEL_ID": <channel for the hackathon announcements>,
   "GUILD_ID": <id of your hackathons discord server>,
   "MENTOR_ROLE_ID": <id of the role only mentors have in discord>,
   "ORGANIZER_ROLE_ID": <if of the role only organizers have in discord>,
-  "API_TOKEN": "<discord api token>"
+  "API_TOKEN": "<discord api token>",
+  "ANNOUNCEMENT_SECRET": "<secret for announcement endpoint authentication>"
 }
 ```
 
