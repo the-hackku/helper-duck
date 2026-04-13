@@ -741,7 +741,7 @@ async def on_message(message: nc.Message) -> None:
                 ANNOUNCEMENT_ENDPOINT,
                 headers={"X-Announcement-Secret": ANNOUNCEMENT_SECRET},
                 json={
-                    "content": message.content,
+                    "content": message.clean_content,
                     "publishedAt": message.created_at.isoformat(),
                     "authorId": str(message.author.id),
                     "authorName": message.author.display_name, # Use the server nickname
@@ -776,7 +776,7 @@ async def on_message_edit(before: nc.Message, after: nc.Message) -> None:
                 response = requests.patch(
                     ANNOUNCEMENT_ENDPOINT,
                     headers={"X-Announcement-Secret": ANNOUNCEMENT_SECRET},
-                    json={"id": announcement_id, "content": after.content},
+                    json={"id": announcement_id, "content": after.clean_content},
                 )
                 if response.status_code != 200:
                     raise Exception(f"Received non-200 response: {response.status_code} - {response.text}")
