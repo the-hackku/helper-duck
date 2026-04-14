@@ -744,6 +744,7 @@ async def on_message(message: nc.Message) -> None:
                     "content": message.clean_content,
                     "publishedAt": message.created_at.isoformat(),
                     "authorId": str(message.author.id),
+                    "role": message.author.top_role.name, # type: ignore
                     "authorName": message.author.display_name, # Use the server nickname
                 },
             )
