@@ -607,7 +607,7 @@ async def on_message(message: nc.message.Message):
 
         # if number is equal to last numeric message + 1 and is sent by a different author than the last message, keep going and react with a checkmark
         # (also keeps track of high score)
-        if message_num == current_num + 1:
+        if message_num == current_num + 1 and message.author.id != last_user_id:
             current_num += 1
             if current_num > high_score:
                 high_score = current_num
@@ -615,7 +615,7 @@ async def on_message(message: nc.message.Message):
             await message.add_reaction('✅')
         # otherwise, reset count, reply with message detailing to user what they did wrong, and react with an X
         else:
-            if message.author.id != last_user_id:
+            if message.author.id == last_user_id:
                 await message.reply("**No double-posting!**\nCount reset.")
             elif message_num != current_num + 1:
                 await message.reply(f"Wrong number! The correct number was **{current_num + 1}**.\nHigh score: **{high_score}**\nCount reset.")
