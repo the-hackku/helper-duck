@@ -33,6 +33,7 @@ WELCOME_MESSAGE_ID: int = int(_require_env("WELCOME_MESSAGE_ID"))
 ANNOUNCEMENT_CHANNEL_ID: int = int(_require_env("ANNOUNCEMENT_CHANNEL_ID"))
 ANNOUNCEMENT_ENDPOINT: str = _require_env("ANNOUNCEMENT_ENDPOINT")
 ANNOUNCEMENT_SECRET: str = _require_env("ANNOUNCEMENT_SECRET")
+COUNTING_CHANNEL_ID: int = int(_require_env("COUNTING_CHANNEL_ID"))
 API_TOKEN: str = _require_env("API_TOKEN")
 
 
@@ -732,8 +733,15 @@ async def give_role(member: nc.Member, guild: nc.Guild, role_name: str) -> None:
     if role is not None:
         await member.add_roles(role)  # gives the user the requested role
 
+# variables for the counting game
+current_num = 0
+last_user_id = None
+high_score = 0
+
 @bot.event
 async def on_message(message: nc.Message) -> None:
+    # establishes that global variables are being used
+    global current_num, last_user_id, high_score
     # Send announcements to the website announcement endpoint
     if message.channel.id == ANNOUNCEMENT_CHANNEL_ID and message.author != bot.user and len(message.content) > 25:
         try:
@@ -763,6 +771,27 @@ async def on_message(message: nc.Message) -> None:
             )
         except Exception as e:
             logger.error(f"Failed to send announcement from {message.author.name}: {e}")
+    elif message.channel.id == COUNTING_CHANNEL_ID and message.author != bot.user:
+        # if message content is not strictly a number, ignore
+        if message.content.isdigit():
+            message_num = int(message.content)
+
+            # if number is equal to last numeric message + 1 and is sent by a different author than the last message, keep going and react with a checkmark
+            # (also keeps track of high score)
+            if message_num == current_num + 1 and message.author.id != last_user_id:
+                current_num += 1
+                if current_num > high_score:
+                    high_score = current_num
+                last_user_id = message.author.id
+                await message.add_reaction('✅')
+            # otherwise, reset count, reply with message detailing to user what they did wrong, and react with an X
+            else:
+                if message.author.id == last_user_id:
+                    await message.reply("**No double-posting!**\nCount reset.")
+                elif message_num != current_num + 1:
+                    await message.reply(f"Wrong number! The correct number was **{current_num + 1}**.\nHigh score: **{high_score}**\nCount reset.")
+                current_num = 0
+                await message.add_reaction('❌')
 
 
 @bot.event
