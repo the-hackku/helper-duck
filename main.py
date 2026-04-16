@@ -621,8 +621,6 @@ async def on_message(message: nc.message.Message):
                 await message.reply(f"Wrong number! The correct number was **{current_num + 1}**.\nHigh score: **{high_score}**\nCount reset.")
             current_num = 0
             await message.add_reaction('❌')
-    # onto next message
-    await bot.process_commands(message) 
 
 
 bot.run(config['API_TOKEN'])
