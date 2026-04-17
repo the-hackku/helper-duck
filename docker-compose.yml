@@ -1,0 +1,22 @@
+services:
+  bot:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - bot-data:/home/bot/data
+    environment:
+      - DB_FILE=/home/bot/data/database.db
+      - API_TOKEN=${API_TOKEN}
+      - GUILD_ID=${GUILD_ID}
+      - MENTOR_ROLE_ID=${MENTOR_ROLE_ID}
+      - ORGANIZER_ROLE_ID=${ORGANIZER_ROLE_ID}
+      - MENTOR_CHANNEL_ID=${MENTOR_CHANNEL_ID}
+      - HELP_CHANNEL_ID=${HELP_CHANNEL_ID}
+      - WELCOME_MESSAGE_ID=${WELCOME_MESSAGE_ID}
+      - ANNOUNCEMENT_CHANNEL_ID=${ANNOUNCEMENT_CHANNEL_ID}
+      - ANNOUNCEMENT_ENDPOINT=${ANNOUNCEMENT_ENDPOINT}
+      - ANNOUNCEMENT_SECRET=${ANNOUNCEMENT_SECRET}
+      - COUNTING_CHANNEL_ID=${COUNTING_CHANNEL_ID}
+
+volumes:
+  bot-data:
