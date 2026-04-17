@@ -791,6 +791,7 @@ async def on_message(message: nc.Message) -> None:
                 elif message_num != current_num + 1:
                     await message.reply(f"Wrong number! The correct number was **{current_num + 1}**.\nHigh score: **{high_score}**\nCount reset.")
                 current_num = 0
+                last_user_id = None
                 await message.add_reaction('❌')
 
 
