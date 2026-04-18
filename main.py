@@ -786,11 +786,12 @@ async def on_message(message: nc.Message) -> None:
                 await message.add_reaction('✅')
             # otherwise, reset count, reply with message detailing to user what they did wrong, and react with an X
             else:
+                old_num = current_num
+                current_num = 0
                 if message.author.id == last_user_id:
                     await message.reply("**No double-posting!**\nCount reset.")
-                elif message_num != current_num + 1:
-                    await message.reply(f"Wrong number! The correct number was **{current_num + 1}**.\nHigh score: **{high_score}**\nCount reset.")
-                current_num = 0
+                elif message_num != old_num + 1:
+                    await message.reply(f"Wrong number! The correct number was **{old_num + 1}**.\nHigh score: **{high_score}**\nCount reset.")
                 last_user_id = None
                 await message.add_reaction('❌')
 
