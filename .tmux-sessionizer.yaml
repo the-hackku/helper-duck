@@ -1,0 +1,5 @@
+name: duck
+windows:
+  - terminal: 
+  - nvim: nvim .
+  - claude: jai claude

@@ -1,3 +1,4 @@
+from calculate_num import convert_to_int
 import logging
 import sqlite3 as sql
 from os import getenv
@@ -35,6 +36,7 @@ ANNOUNCEMENT_ENDPOINT: str = _require_env("ANNOUNCEMENT_ENDPOINT")
 ANNOUNCEMENT_SECRET: str = _require_env("ANNOUNCEMENT_SECRET")
 COUNTING_CHANNEL_ID: int = int(_require_env("COUNTING_CHANNEL_ID"))
 API_TOKEN: str = _require_env("API_TOKEN")
+COUNTING_START: int = int(getenv("COUNTING_START", "0"))
 
 
 intents: nc.Intents = nc.Intents.default()
@@ -734,9 +736,9 @@ async def give_role(member: nc.Member, guild: nc.Guild, role_name: str) -> None:
         await member.add_roles(role)  # gives the user the requested role
 
 # variables for the counting game
-current_num = 0
+current_num = COUNTING_START
 last_user_id = None
-high_score = 0
+high_score = COUNTING_START
 
 @bot.event
 async def on_message(message: nc.Message) -> None:
@@ -771,14 +773,19 @@ async def on_message(message: nc.Message) -> None:
             )
         except Exception as e:
             logger.error(f"Failed to send announcement from {message.author.name}: {e}")
+
+    # Counting channel logic
     elif message.channel.id == COUNTING_CHANNEL_ID and message.author != bot.user:
-        # if message content is not strictly a number, ignore
-        if message.content.isdigit():
-            message_num = int(message.content)
+        # if message content is not strictly a number, or calculates to one (within 5 seconds) ignore
+        message_num = convert_to_int(message.content)
+
+        if message_num:
+            # message_num = int(message.content)
+            print("Calculated value: ", message_num)
 
             # if number is equal to last numeric message + 1 and is sent by a different author than the last message, keep going and react with a checkmark
             # (also keeps track of high score)
-            if message_num == current_num + 1 and message.author.id != last_user_id:
+            if message_num and message_num == current_num + 1 and message.author.id != last_user_id:
                 current_num += 1
                 if current_num > high_score:
                     high_score = current_num
