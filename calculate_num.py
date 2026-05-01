@@ -47,10 +47,7 @@ def _evaluate_expr(msg: str) -> Optional[int]:
         pass
 
     if expr is None:
-        try:
-            expr = sympify(expr_str)
-        except Exception:
-            return None
+        return None
 
     try:
         if subs:
